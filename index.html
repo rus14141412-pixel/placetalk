@@ -59,11 +59,16 @@ body{
 .cardHeader{padding:22px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .cardHeader h2{margin:0;font-size:18px}
 .sub{margin-top:8px;color:var(--muted);font-size:15px;line-height:1.45}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .search{
-  width:280px;max-width:48vw;padding:11px 12px;border-radius:14px;
+  width:240px;max-width:48vw;padding:11px 12px;border-radius:14px;
   border:1px solid var(--line);background:#121214;color:var(--text);outline:none;
 }
 .search::placeholder{color:#7f7f86}
+.select{
+  padding:11px 12px;border-radius:14px;border:1px solid var(--line);
+  background:#121214;color:var(--text);outline:none;font-size:14px;
+}
 .list{border-top:1px solid var(--line)}
 .row{
   padding:18px 22px;border-top:1px solid rgba(255,255,255,.03);
@@ -103,16 +108,14 @@ body{
 .link{color:var(--muted);text-decoration:underline;cursor:pointer}
 .topline{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .notice{
-  margin-top:10px;
-  padding:10px 12px;
-  border:1px solid var(--line);
-  border-radius:14px;
-  background:#141416;
-  color:var(--muted);
-  font-size:14px;
-  line-height:1.4;
+  margin-top:10px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:14px;background:#141416;color:var(--muted);
+  font-size:14px;line-height:1.4;
 }
 .notice b{color:var(--text)}
+.miniBtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn.ghost{background:#141416}
+.btn.ghost:hover{background:#1b1b1d}
 </style>
 </head>
 
@@ -138,10 +141,19 @@ body{
       <div class="cardHeader">
         <div>
           <h2 id="mainTitle">Темы</h2>
-          <div class="sub" id="mainSub">Теперь это онлайн: темы и ответы общие для всех по ссылке.</div>
+          <div class="sub" id="mainSub">Категории, антиспам и жалобы уже включены.</div>
           <div class="notice" id="statusBox">Подключаемся к базе…</div>
         </div>
-        <input class="search" id="search" placeholder="Поиск по темам..." />
+        <div class="controls">
+          <select class="select" id="catFilter">
+            <option value="all">Все категории</option>
+            <option>Обсуждения</option>
+            <option>Идеи</option>
+            <option>Общение</option>
+            <option>Новости</option>
+          </select>
+          <input class="search" id="search" placeholder="Поиск..." />
+        </div>
       </div>
 
       <div class="list" id="list"></div>
@@ -161,12 +173,12 @@ body{
 
         <div class="hr"></div>
 
-        <h2 style="margin:0;font-size:18px">Важно</h2>
+        <h2 style="margin:0;font-size:18px">Антиспам</h2>
         <div class="sub" style="margin-top:8px">
-          Сейчас доступ открыт всем (без регистрации). Следующий шаг — сделать вход/роли и защиту от спама.
+          1 тема в минуту, 1 ответ в 15 секунд + лимиты длины текста.
         </div>
 
-        <div class="footer">placetalk • supabase REST</div>
+        <div class="footer">placetalk • v1</div>
       </div>
     </div>
   </div>
@@ -185,6 +197,14 @@ body{
 </div>
 
 <script>
+/*** >>> НАСТРОЙКИ SUPABASE (вставь свои) <<< ***/
+const SUPABASE_URL = "https://wfwvzvghmkbhvqcwusma.supabase.co";
+const SUPABASE_KEY = "PASTE_YOUR_ANON_KEY_EYJ_HERE";
+/*** ------------------------------------------------ ***/
+
+const REST = `${SUPABASE_URL}/rest/v1`;
+const LS_NICK = "placetalk_nick_v1";
+
 // --- anti-spam limits ---
 const LIMIT_TOPIC_MS = 60_000;   // 1 тема в минуту
 const LIMIT_REPLY_MS = 15_000;   // 1 ответ в 15 секунд
@@ -205,17 +225,10 @@ function canDo(key, limitMs){
   }
   localStorage.setItem(key, String(now));
   return true;
-}  
-/*** >>> ТВОИ НАСТРОЙКИ SUPABASE <<< ***/
-const SUPABASE_URL = "https://wfwvzvghmkbhvqcwusma.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indmd3Z6dmdobWtiaHZxY3d1c21hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1NDQ2MTksImV4cCI6MjA4NDEyMDYxOX0.wCmHEOsdrm__Sa-4-CzRs-wLICqsW6vEPmY5ucf9OTo";
-/*** -------------------------------- ***/
-
-const REST = `${SUPABASE_URL}/rest/v1`;
-const LS_NICK = "placetalk_nick_v1";
+}
 
 let state = { topics: [], postsByTopic: new Map() };
-let view = { mode:"home", topicId:null, q:"" };
+let view = { mode:"home", topicId:null, q:"", cat:"all" };
 
 function headers(){
   return {
@@ -271,17 +284,19 @@ async function restGet(path){
   if(!r.ok) throw new Error(`${r.status} ${r.statusText}: ${text}`);
   return text ? JSON.parse(text) : null;
 }
-
 async function restPost(path, body){
-  const r = await fetch(`${REST}${path}`, { method:"POST", headers: { ...headers(), "Prefer":"return=representation" }, body: JSON.stringify(body) });
+  const r = await fetch(`${REST}${path}`, {
+    method:"POST",
+    headers: { ...headers(), "Prefer":"return=representation" },
+    body: JSON.stringify(body)
+  });
   const text = await r.text();
   if(!r.ok) throw new Error(`${r.status} ${r.statusText}: ${text}`);
   return text ? JSON.parse(text) : null;
 }
 
 async function loadTopics(){
-  // order=created_at.desc
-  const data = await restGet(`/topics?select=id,title,body,author,created_at&order=created_at.desc`);
+  const data = await restGet(`/topics?select=id,title,body,author,category,created_at&order=created_at.desc`);
   state.topics = data || [];
   document.getElementById("countPill").textContent = `тем: ${state.topics.length}`;
 }
@@ -291,9 +306,8 @@ async function loadPosts(topicId){
   state.postsByTopic.set(topicId, data || []);
 }
 
-async function createTopic(title, body){
-  const data = await restPost(`/topics`, [{ title, body, author: getNick() }]);
-  // вернётся массив с 1 элементом
+async function createTopic(title, body, category){
+  const data = await restPost(`/topics`, [{ title, body, category, author: getNick() }]);
   return data?.[0];
 }
 
@@ -302,20 +316,34 @@ async function createPost(topicId, text){
   return data?.[0];
 }
 
+async function createReport(targetType, targetId, reason){
+  const data = await restPost(`/reports`, [{
+    target_type: targetType,
+    target_id: targetId,
+    reason,
+    reporter: getNick()
+  }]);
+  return data?.[0];
+}
+
 // -------- UI render --------
 function filterTopics(topics){
   const q = view.q.trim().toLowerCase();
-  if(!q) return topics;
-  return topics.filter(t =>
-    (t.title||"").toLowerCase().includes(q) ||
-    (t.body||"").toLowerCase().includes(q) ||
-    (t.author||"").toLowerCase().includes(q)
-  );
+  const cat = view.cat;
+
+  return topics.filter(t => {
+    if(cat !== "all" && (t.category || "Обсуждения") !== cat) return false;
+    if(!q) return true;
+    return (t.title||"").toLowerCase().includes(q) ||
+           (t.body||"").toLowerCase().includes(q) ||
+           (t.author||"").toLowerCase().includes(q) ||
+           (t.category||"").toLowerCase().includes(q);
+  });
 }
 
 function renderHome(){
   document.getElementById("mainTitle").textContent = "Темы";
-  document.getElementById("mainSub").textContent = "Создавай темы — они видны всем. Пока без регистрации.";
+  document.getElementById("mainSub").textContent = "Категории помогают держать порядок. Спам режется лимитами.";
 
   const list = document.getElementById("list");
   const topics = filterTopics(state.topics);
@@ -339,8 +367,8 @@ function renderHome(){
         <div class="meta">${escapeHtml((t.body||"").slice(0,90))}${(t.body||"").length>90?"…":""}</div>
       </div>
       <div class="right">
-        <span class="pill">@${escapeHtml(t.author || "гость")}</span>
-        <div class="small">${escapeHtml(fmtTime(t.created_at))}</div>
+        <span class="pill">${escapeHtml(t.category || "Обсуждения")}</span>
+        <div class="small">@${escapeHtml(t.author || "гость")} • ${escapeHtml(fmtTime(t.created_at))}</div>
       </div>
     </div>
   `).join("");
@@ -352,7 +380,8 @@ function renderHome(){
 
 async function renderTopic(topic){
   document.getElementById("mainTitle").textContent = topic.title;
-  document.getElementById("mainSub").textContent = `Автор: ${topic.author || "гость"} • ${fmtTime(topic.created_at)}`;
+  document.getElementById("mainSub").textContent =
+    `${topic.category || "Обсуждения"} • Автор: ${topic.author || "гость"} • ${fmtTime(topic.created_at)}`;
 
   const list = document.getElementById("list");
   const posts = state.postsByTopic.get(topic.id) || [];
@@ -366,6 +395,9 @@ async function renderTopic(topic){
           <span>${escapeHtml(fmtTime(p.created_at))}</span>
         </div>
         <div class="text">${escapeHtml(p.text)}</div>
+        <div class="miniBtns">
+          <button class="btn ghost" data-report="post" data-id="${p.id}">Пожаловаться</button>
+        </div>
       </div>
     </div>
   `).join("");
@@ -378,6 +410,9 @@ async function renderTopic(topic){
           <span>${escapeHtml(fmtTime(topic.created_at))}</span>
         </div>
         <div class="text">${escapeHtml(topic.body)}</div>
+        <div class="miniBtns">
+          <button class="btn ghost" id="reportTopicBtn">Пожаловаться на тему</button>
+        </div>
       </div>
     </div>
 
@@ -387,6 +422,25 @@ async function renderTopic(topic){
 
     ${postsHtml}
   `;
+
+  document.getElementById("reportTopicBtn").onclick = () => {
+    openModal("Пожаловаться на тему", `
+      <div class="field">
+        <textarea class="textarea" id="repReason" placeholder="Что не так? (спам, оскорбления, реклама...)"></textarea>
+      </div>
+    `, async () => {
+      const reason = (document.getElementById("repReason").value || "").trim();
+      if(!reason){ alert("Напиши причину"); return false; }
+      if(reason.length > 500){ alert("Слишком длинно (до 500)"); return false; }
+      try{
+        await createReport("topic", topic.id, reason);
+        alert("Жалоба отправлена.");
+      }catch(e){
+        alert("Ошибка: " + e.message);
+        return false;
+      }
+    });
+  };
 
   document.getElementById("replyBtn").onclick = () => {
     openModal("Ответить", `
@@ -398,6 +452,9 @@ async function renderTopic(topic){
       const text = (document.getElementById("replyText").value || "").trim();
       if(!text){ alert("Напиши текст ответа"); return false; }
 
+      if(!canDo(LS_LAST_REPLY, LIMIT_REPLY_MS)) return false;
+      if(text.length > MAX_REPLY){ alert(`Слишком длинный ответ (до ${MAX_REPLY} символов)`); return false; }
+
       try{
         await createPost(topic.id, text);
         await loadPosts(topic.id);
@@ -408,6 +465,29 @@ async function renderTopic(topic){
       }
     });
   };
+
+  // report buttons for posts
+  [...list.querySelectorAll("[data-report='post']")].forEach(btn=>{
+    btn.onclick = () => {
+      const postId = btn.getAttribute("data-id");
+      openModal("Пожаловаться на сообщение", `
+        <div class="field">
+          <textarea class="textarea" id="repReason2" placeholder="Причина жалобы..."></textarea>
+        </div>
+      `, async () => {
+        const reason = (document.getElementById("repReason2").value || "").trim();
+        if(!reason){ alert("Напиши причину"); return false; }
+        if(reason.length > 500){ alert("Слишком длинно (до 500)"); return false; }
+        try{
+          await createReport("post", postId, reason);
+          alert("Жалоба отправлена.");
+        }catch(e){
+          alert("Ошибка: " + e.message);
+          return false;
+        }
+      });
+    };
+  });
 }
 
 async function render(){
@@ -447,6 +527,14 @@ document.getElementById("loginBtn").onclick = () => {
 document.getElementById("newTopicBtn").onclick = () => {
   openModal("Создать тему", `
     <div class="field">
+      <select class="select" id="topicCat">
+        <option>Обсуждения</option>
+        <option>Идеи</option>
+        <option>Общение</option>
+        <option>Новости</option>
+      </select>
+    </div>
+    <div class="field">
       <input class="input" id="topicTitle" placeholder="Название темы (коротко)">
     </div>
     <div class="field">
@@ -454,14 +542,19 @@ document.getElementById("newTopicBtn").onclick = () => {
       <div class="sub" style="margin-top:8px">Подпишется ником: <b>${escapeHtml(getNick())}</b></div>
     </div>
   `, async () => {
+    const category = (document.getElementById("topicCat").value || "Обсуждения").trim();
     const title = (document.getElementById("topicTitle").value || "").trim();
     const body  = (document.getElementById("topicBody").value || "").trim();
+
     if(!title){ alert("Нужно название"); return false; }
-    if(title.length>80){ alert("Слишком длинное название (до 80 символов)"); return false; }
     if(!body){ alert("Нужен текст"); return false; }
 
+    if(!canDo(LS_LAST_TOPIC, LIMIT_TOPIC_MS)) return false;
+    if(title.length > MAX_TITLE){ alert(`Слишком длинное название (до ${MAX_TITLE} символов)`); return false; }
+    if(body.length > MAX_BODY){ alert(`Слишком длинный текст (до ${MAX_BODY} символов)`); return false; }
+
     try{
-      await createTopic(title, body);
+      await createTopic(title, body, category);
       await loadTopics();
       view.mode="home"; view.topicId=null;
       await render();
@@ -485,8 +578,9 @@ document.getElementById("seedLink").onclick = async () => {
       alert("Темы уже есть. Не будем мешать.");
       return;
     }
-    await createTopic("Правила и атмосфера placetalk", "Давайте без токсичности. Спокойно общаемся, не унижаем друг друга.");
-    await createTopic("Идеи для развития форума", "Что добавить первым: категории, поиск, лайки, закрепы?");
+    await createTopic("Правила и атмосфера placetalk", "Давайте без токсичности. Спокойно общаемся, не унижаем друг друга.", "Новости");
+    await createTopic("Идеи для развития форума", "Что добавить первым: категории, поиск, лайки, закрепы?", "Идеи");
+    await createTopic("Свободное общение", "Кидайте сюда любые разговоры без негатива.", "Общение");
     await loadTopics();
     await render();
   }catch(e){
@@ -503,11 +597,14 @@ document.getElementById("clearLink").onclick = () => {
   });
 };
 
-document.getElementById("search").addEventListener("input", async (e)=>{
+document.getElementById("search").addEventListener("input", (e)=>{
   view.q = e.target.value || "";
-  if(view.mode==="home"){
-    renderHome();
-  }
+  if(view.mode==="home") renderHome();
+});
+
+document.getElementById("catFilter").addEventListener("change", (e)=>{
+  view.cat = e.target.value || "all";
+  if(view.mode==="home") renderHome();
 });
 
 // init
