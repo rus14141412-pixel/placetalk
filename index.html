@@ -11,7 +11,6 @@
   --text:#f2f2f3;
   --muted:#b4b4b8;
   --line:#2a2a2c;
-  --panel:#171718;
   --chip:#232325;
   --shadow: 0 14px 44px rgba(0,0,0,.5);
   --r: 18px;
@@ -103,6 +102,17 @@ body{
 .modalActions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
 .link{color:var(--muted);text-decoration:underline;cursor:pointer}
 .topline{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.notice{
+  margin-top:10px;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#141416;
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.4;
+}
+.notice b{color:var(--text)}
 </style>
 </head>
 
@@ -127,8 +137,9 @@ body{
     <div class="card">
       <div class="cardHeader">
         <div>
-          <h2 id="mainTitle">Разделы</h2>
-          <div class="sub" id="mainSub">Пока без регистрации и серверов — но уже можно писать.</div>
+          <h2 id="mainTitle">Темы</h2>
+          <div class="sub" id="mainSub">Теперь это онлайн: темы и ответы общие для всех по ссылке.</div>
+          <div class="notice" id="statusBox">Подключаемся к базе…</div>
         </div>
         <input class="search" id="search" placeholder="Поиск по темам..." />
       </div>
@@ -145,17 +156,17 @@ body{
         <div class="sub" style="margin-top:8px">
           <span class="link" id="homeLink">На главную</span> ·
           <span class="link" id="seedLink">Заполнить примером</span> ·
-          <span class="link" id="clearLink">Очистить</span>
+          <span class="link" id="clearLink">Очистить у себя</span>
         </div>
 
         <div class="hr"></div>
 
-        <h2 style="margin:0;font-size:18px">Как это работает</h2>
+        <h2 style="margin:0;font-size:18px">Что дальше</h2>
         <div class="sub" style="margin-top:8px">
-          Ник и сообщения сохраняются <b>в твоём браузере</b>. Это “живой макет”, следующий шаг — настоящая база.
+          Сейчас доступ открыт всем (без регистрации). Следующий правильный шаг — добавить простую авторизацию и правила.
         </div>
 
-        <div class="footer">placetalk • local prototype</div>
+        <div class="footer">placetalk • supabase</div>
       </div>
     </div>
   </div>
@@ -173,8 +184,17 @@ body{
   </div>
 </div>
 
+<!-- Supabase JS (UMD) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
-const LS_KEY = "placetalk_forum_v1";
+/*** >>> ТВОИ НАСТРОЙКИ SUPABASE <<< ***/
+const SUPABASE_URL = "https://wfwvzghmkbhvqcwusma.supabase.co";
+const SUPABASE_KEY = "sb_publishable_QElYekB6NtO9POPRxY6GvQ_hTPQ9FT8";
+/*** -------------------------------- ***/
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const LS_NICK = "placetalk_nick_v1";
 
 function nowLabel(){
@@ -182,15 +202,6 @@ function nowLabel(){
   const pad = n => String(n).padStart(2,"0");
   return `${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-
-function loadState(){
-  const raw = localStorage.getItem(LS_KEY);
-  if(raw){
-    try { return JSON.parse(raw); } catch(e){}
-  }
-  return { topics: [] };
-}
-function saveState(s){ localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 
 function getNick(){
   return localStorage.getItem(LS_NICK) || "гость";
@@ -200,16 +211,12 @@ function setNick(n){
   renderHeader();
 }
 
-let state = loadState();
-let view = { mode:"home", topicId:null, q:"" };
-
 function renderHeader(){
   document.getElementById("whoPill").textContent = getNick();
 }
 
-function id(){
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
+let state = { topics: [], postsByTopic: new Map() };
+let view = { mode:"home", topicId:null, q:"" };
 
 function openModal(title, bodyHtml, onOk){
   const back = document.getElementById("modalBack");
@@ -227,22 +234,65 @@ function openModal(title, bodyHtml, onOk){
   };
 }
 
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
+
+function setStatus(ok, msg){
+  const box = document.getElementById("statusBox");
+  box.innerHTML = ok ? `✅ <b>Ок</b> — ${msg}` : `⚠️ <b>Проблема</b> — ${msg}`;
+}
+
+async function loadTopics(){
+  const { data, error } = await supabaseClient
+    .from("topics")
+    .select("id,title,body,author,created_at")
+    .order("created_at", { ascending: false });
+
+  if(error) throw error;
+  state.topics = data || [];
+  document.getElementById("countPill").textContent = `тем: ${state.topics.length}`;
+}
+
+async function loadPosts(topicId){
+  const { data, error } = await supabaseClient
+    .from("posts")
+    .select("id,topic_id,author,text,created_at")
+    .eq("topic_id", topicId)
+    .order("created_at", { ascending: true });
+
+  if(error) throw error;
+  state.postsByTopic.set(topicId, data || []);
+}
+
 function formatTopics(topics){
   const q = view.q.trim().toLowerCase();
   if(!q) return topics;
   return topics.filter(t =>
-    t.title.toLowerCase().includes(q) ||
-    (t.body || "").toLowerCase().includes(q) ||
-    t.posts.some(p => p.text.toLowerCase().includes(q))
+    (t.title||"").toLowerCase().includes(q) ||
+    (t.body||"").toLowerCase().includes(q) ||
+    (t.author||"").toLowerCase().includes(q)
   );
+}
+
+function fmtTime(iso){
+  if(!iso) return "";
+  // Покажем коротко: DD.MM HH:MM
+  try{
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2,"0");
+    return `${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }catch(e){ return iso; }
 }
 
 function renderHome(){
   document.getElementById("mainTitle").textContent = "Темы";
-  document.getElementById("mainSub").textContent = "Создай тему — и она появится здесь. Пока всё хранится в браузере.";
+  document.getElementById("mainSub").textContent = "Создавай темы — они видны всем. Пока без регистрации.";
+
   const list = document.getElementById("list");
-  const topics = formatTopics([...state.topics].sort((a,b)=>b.createdAt-a.createdAt));
-  document.getElementById("countPill").textContent = `тем: ${state.topics.length}`;
+  const topics = formatTopics(state.topics);
 
   if(topics.length === 0){
     list.innerHTML = `
@@ -251,23 +301,21 @@ function renderHome(){
           <div class="title">Пока пусто</div>
           <div class="meta">Нажми “Создать тему” или “Заполнить примером”.</div>
         </div>
-        <div class="right"><span class="pill">0</span><div class="small">сообщений</div></div>
+        <div class="right"><span class="pill">0</span><div class="small">тем</div></div>
       </div>`;
     return;
   }
 
   list.innerHTML = topics.map(t => {
-    const replies = t.posts.length;
-    const last = replies ? t.posts[t.posts.length-1].at : t.at;
     return `
       <div class="row" data-open="${t.id}">
         <div>
           <div class="title">${escapeHtml(t.title)}</div>
-          <div class="meta">${escapeHtml(t.body.slice(0,90))}${t.body.length>90?"…":""}</div>
+          <div class="meta">${escapeHtml((t.body||"").slice(0,90))}${(t.body||"").length>90?"…":""}</div>
         </div>
         <div class="right">
-          <span class="pill">${replies} ответов</span>
-          <div class="small">последнее: ${escapeHtml(last)}</div>
+          <span class="pill">@${escapeHtml(t.author || "гость")}</span>
+          <div class="small">${escapeHtml(fmtTime(t.created_at))}</div>
         </div>
       </div>
     `;
@@ -278,18 +326,20 @@ function renderHome(){
   });
 }
 
-function renderTopic(topic){
+async function renderTopic(topic){
   document.getElementById("mainTitle").textContent = topic.title;
-  document.getElementById("mainSub").textContent = `Автор: ${topic.author} • ${topic.at}`;
-  const list = document.getElementById("list");
-  document.getElementById("countPill").textContent = `ответов: ${topic.posts.length}`;
+  document.getElementById("mainSub").textContent = `Автор: ${topic.author || "гость"} • ${fmtTime(topic.created_at)}`;
 
-  const postsHtml = topic.posts.map(p=>`
+  const list = document.getElementById("list");
+  const posts = state.postsByTopic.get(topic.id) || [];
+  document.getElementById("countPill").textContent = `ответов: ${posts.length}`;
+
+  const postsHtml = posts.map(p=>`
     <div class="row" style="cursor:default;align-items:flex-start">
       <div style="width:100%">
         <div class="who">
-          <span>@${escapeHtml(p.author)}</span>
-          <span>${escapeHtml(p.at)}</span>
+          <span>@${escapeHtml(p.author || "гость")}</span>
+          <span>${escapeHtml(fmtTime(p.created_at))}</span>
         </div>
         <div class="text">${escapeHtml(p.text)}</div>
       </div>
@@ -300,8 +350,8 @@ function renderTopic(topic){
     <div class="row" style="cursor:default;align-items:flex-start">
       <div style="width:100%">
         <div class="who">
-          <span>@${escapeHtml(topic.author)}</span>
-          <span>${escapeHtml(topic.at)}</span>
+          <span>@${escapeHtml(topic.author || "гость")}</span>
+          <span>${escapeHtml(fmtTime(topic.created_at))}</span>
         </div>
         <div class="text">${escapeHtml(topic.body)}</div>
       </div>
@@ -318,38 +368,42 @@ function renderTopic(topic){
     openModal("Ответить", `
       <div class="field">
         <textarea class="textarea" id="replyText" placeholder="Твой ответ..."></textarea>
+        <div class="sub" style="margin-top:8px">Подпишется ником: <b>${escapeHtml(getNick())}</b></div>
       </div>
-    `, () => {
+    `, async () => {
       const text = (document.getElementById("replyText").value || "").trim();
       if(!text){ alert("Напиши текст ответа"); return false; }
-      const t = state.topics.find(x=>x.id===topic.id);
-      t.posts.push({ id:id(), author:getNick(), at: nowLabel(), text });
-      saveState(state);
-      openTopic(topic.id);
+
+      const { error } = await supabaseClient
+        .from("posts")
+        .insert([{ topic_id: topic.id, author: getNick(), text }]);
+
+      if(error){ alert("Ошибка сохранения: " + error.message); return false; }
+
+      await loadPosts(topic.id);
+      await renderTopic(topic);
     });
   };
 }
 
-function render(){
+async function render(){
   renderHeader();
-  if(view.mode==="home") renderHome();
-  else {
+  if(view.mode==="home"){
+    renderHome();
+  }else{
     const t = state.topics.find(x=>x.id===view.topicId);
     if(!t){ view.mode="home"; view.topicId=null; renderHome(); return; }
-    renderTopic(t);
+    if(!state.postsByTopic.has(t.id)){
+      await loadPosts(t.id);
+    }
+    await renderTopic(t);
   }
 }
 
-function openTopic(topicId){
+async function openTopic(topicId){
   view.mode="topic";
   view.topicId=topicId;
-  render();
-}
-
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-  }[c]));
+  await render();
 }
 
 // UI actions
@@ -373,66 +427,82 @@ document.getElementById("newTopicBtn").onclick = () => {
     </div>
     <div class="field">
       <textarea class="textarea" id="topicBody" placeholder="О чём хочешь поговорить?"></textarea>
+      <div class="sub" style="margin-top:8px">Подпишется ником: <b>${escapeHtml(getNick())}</b></div>
     </div>
-  `, () => {
+  `, async () => {
     const title = (document.getElementById("topicTitle").value || "").trim();
     const body  = (document.getElementById("topicBody").value || "").trim();
     if(!title){ alert("Нужно название"); return false; }
     if(title.length>80){ alert("Слишком длинное название (до 80 символов)"); return false; }
     if(!body){ alert("Нужен текст"); return false; }
 
-    const t = {
-      id: id(),
-      title,
-      body,
-      author: getNick(),
-      at: nowLabel(),
-      createdAt: Date.now(),
-      posts: []
-    };
-    state.topics.unshift(t);
-    saveState(state);
-    view.mode="home";
-    view.topicId=null;
-    render();
+    const { error } = await supabaseClient
+      .from("topics")
+      .insert([{ title, body, author: getNick() }]);
+
+    if(error){ alert("Ошибка сохранения: " + error.message); return false; }
+
+    await loadTopics();
+    view.mode="home"; view.topicId=null;
+    await render();
   });
 };
 
-document.getElementById("homeLink").onclick = () => {
-  view.mode="home"; view.topicId=null; render();
+document.getElementById("homeLink").onclick = async () => {
+  view.mode="home"; view.topicId=null;
+  await loadTopics();
+  await render();
 };
 
-document.getElementById("seedLink").onclick = () => {
-  if(state.topics.length) { alert("Уже есть темы. Если хочешь пример — сначала очисти."); return; }
-  state.topics = [
-    { id:id(), title:"Правила и атмосфера placetalk", body:"Давайте без токсичности. Спокойно общаемся, не унижаем друг друга.", author:"admin", at:nowLabel(), createdAt:Date.now()-50000, posts:[
-      {id:id(), author:"user", at:nowLabel(), text:"Поддерживаю. Пусть будет уютно."}
-    ]},
-    { id:id(), title:"Идеи для развития форума", body:"Что добавить первым: категории, поиск, лайки, закрепы?", author:"admin", at:nowLabel(), createdAt:Date.now()-80000, posts:[]}
-  ];
-  saveState(state);
-  render();
+document.getElementById("seedLink").onclick = async () => {
+  // Заполним онлайн-примером (только если пока пусто)
+  if(state.topics.length){
+    alert("Темы уже есть. Не будем мешать.");
+    return;
+  }
+  const a = await supabaseClient.from("topics").insert([
+    { title:"Правила и атмосфера placetalk", body:"Давайте без токсичности. Спокойно общаемся, не унижаем друг друга.", author:"admin" },
+    { title:"Идеи для развития форума", body:"Что добавить первым: категории, поиск, лайки, закрепы?", author:"admin" }
+  ]);
+  if(a.error){ alert("Ошибка: " + a.error.message); return; }
+  await loadTopics();
+  await render();
 };
 
 document.getElementById("clearLink").onclick = () => {
-  openModal("Очистить всё?", `
-    <div class="sub">Удалит все темы и ответы в этом браузере. Это необратимо.</div>
+  // Это очистка только у тебя: ник и поиск/вид. Онлайн-данные мы не удаляем.
+  openModal("Очистить у себя?", `
+    <div class="sub">Сбросит ник и поиск в этом браузере. Онлайн-темы не трогаем.</div>
   `, () => {
-    state = { topics: [] };
-    saveState(state);
-    view.mode="home"; view.topicId=null;
-    render();
+    localStorage.removeItem(LS_NICK);
+    view.q = "";
+    document.getElementById("search").value = "";
+    renderHeader();
+    renderHome();
   });
 };
 
-document.getElementById("search").addEventListener("input", (e)=>{
+document.getElementById("search").addEventListener("input", async (e)=>{
   view.q = e.target.value || "";
-  if(view.mode==="home") renderHome();
+  if(view.mode==="home"){
+    renderHome();
+  }
 });
 
 // init
-renderHeader();
-render();
+(async () => {
+  renderHeader();
+  try{
+    await loadTopics();
+    setStatus(true, "подключено к Supabase, темы загрузились");
+    await render();
+  }catch(err){
+    console.error(err);
+    setStatus(false, err.message || String(err));
+    // покажем хоть пустую главную, чтобы интерфейс жил
+    renderHome();
+  }
+})();
 </script>
 </body>
 </html>
