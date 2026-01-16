@@ -302,8 +302,10 @@ async function loadTopics(){
 }
 
 async function loadPosts(topicId){
-  const data = await restGet(`/posts?select=id,topic_id,author,text,created_at&topic_id=eq.${encodeURIComponent(topicId)}&order=created_at.asc`);
+  const data = await restGet(`/posts?select=id,topic_id,author,text,created_at&topic_id=eq.${encodeURIComponent(topicId)}&is_hidden=eq.false&order=created_at.asc`);
   state.postsByTopic.set(topicId, data || []);
+}
+
 }
 
 async function createTopic(title, body, category){
