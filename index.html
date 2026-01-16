@@ -64,7 +64,6 @@ body{
   width:240px;max-width:48vw;padding:11px 12px;border-radius:14px;
   border:1px solid var(--line);background:#121214;color:var(--text);outline:none;
 }
-.search::placeholder{color:#7f7f86}
 .select{
   padding:11px 12px;border-radius:14px;border:1px solid var(--line);
   background:#121214;color:var(--text);outline:none;font-size:14px;
@@ -74,12 +73,13 @@ body{
   padding:18px 22px;border-top:1px solid rgba(255,255,255,.03);
   display:flex;justify-content:space-between;gap:14px;cursor:pointer;
 }
-.row:first-child{border-top:none}
 .row:hover{background:rgba(255,255,255,.03)}
 .title{font-size:16px;font-weight:600}
 .meta{margin-top:6px;font-size:14px;color:var(--muted)}
 .right{text-align:right;min-width:170px}
 .small{margin-top:8px;font-size:13px;color:var(--muted)}
+.side{padding:22px}
+.hr{height:1px;background:var(--line);margin:16px 0}
 .notice{
   margin-top:10px;padding:10px 12px;border:1px solid var(--line);
   border-radius:14px;background:#141416;color:var(--muted);
@@ -108,12 +108,34 @@ body{
     <div class="card">
       <div class="cardHeader">
         <div>
-          <h2>Темы</h2>
-          <div class="sub">Скрытые темы и сообщения не отображаются</div>
+          <h2 id="mainTitle">Темы</h2>
+          <div class="sub" id="mainSub">Категории, антиспам и жалобы включены</div>
           <div class="notice" id="statusBox">Подключаемся…</div>
+        </div>
+        <div class="controls">
+          <select class="select" id="catFilter">
+            <option value="all">Все категории</option>
+            <option>Обсуждения</option>
+            <option>Идеи</option>
+            <option>Общение</option>
+            <option>Новости</option>
+          </select>
+          <input class="search" id="search" placeholder="Поиск..." />
         </div>
       </div>
       <div class="list" id="list"></div>
+    </div>
+
+    <div class="card">
+      <div class="side">
+        <h2>Панель</h2>
+        <span class="pill" id="countPill">тем: 0</span>
+        <div class="hr"></div>
+        <div class="sub">
+          <span id="homeLink" style="cursor:pointer">На главную</span> ·
+          <span id="clearLink" style="cursor:pointer">Сбросить ник</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -139,38 +161,28 @@ async function restGet(path){
 }
 
 async function loadTopics(){
-  const topics = await restGet(
+  const data = await restGet(
     "/topics?select=id,title,body,author,category,created_at&is_hidden=eq.false&order=created_at.desc"
   );
-
   const list = document.getElementById("list");
-  list.innerHTML = "";
-
-  if(!topics.length){
-    list.innerHTML = `<div class="row"><div>Пока нет тем</div></div>`;
-    return;
-  }
-
-  topics.forEach(t=>{
-    const el = document.createElement("div");
-    el.className = "row";
-    el.innerHTML = `
+  document.getElementById("countPill").textContent = `тем: ${data.length}`;
+  list.innerHTML = data.map(t=>`
+    <div class="row">
       <div>
         <div class="title">${t.title}</div>
-        <div class="meta">${t.author} • ${new Date(t.created_at).toLocaleString()}</div>
+        <div class="meta">@${t.author} • ${new Date(t.created_at).toLocaleString()}</div>
       </div>
       <div class="right"><span class="pill">${t.category}</span></div>
-    `;
-    list.appendChild(el);
-  });
+    </div>
+  `).join("");
 }
 
-(async ()=>{
+(async()=>{
   try{
     await loadTopics();
-    document.getElementById("statusBox").innerHTML = "✅ Подключено";
+    document.getElementById("statusBox").textContent = "✅ подключено";
   }catch(e){
-    document.getElementById("statusBox").innerHTML = "⚠️ " + e.message;
+    document.getElementById("statusBox").textContent = "⚠️ " + e.message;
   }
 })();
 </script>
