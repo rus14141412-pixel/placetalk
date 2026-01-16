@@ -10,15 +10,16 @@
   --bg:#0f0f10;
   --panel:#171718;
   --panel2:#1c1c1e;
-  --text:#e9e9ea;
-  --muted:#a9a9ad;
+  --text:#f1f1f2;
+  --muted:#b3b3b7;
   --line:#2a2a2c;
   --chip:#232325;
-  --shadow: 0 12px 40px rgba(0,0,0,.45);
-  --radius: 16px;
+  --shadow: 0 14px 44px rgba(0,0,0,.5);
+  --radius: 18px;
 }
 
 *{box-sizing:border-box}
+
 body{
   margin:0;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif;
@@ -27,328 +28,216 @@ body{
     radial-gradient(900px 600px at 90% 10%, rgba(255,255,255,.04), transparent 55%),
     var(--bg);
   color:var(--text);
+  font-size: 16px;
 }
 
-a{color:inherit; text-decoration:none}
-
 .wrap{
-  max-width: 1050px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 26px 18px 60px;
+  padding: 28px 18px 60px;
 }
 
 .topbar{
   display:flex;
-  gap:14px;
-  align-items:center;
   justify-content:space-between;
-  padding: 18px 18px;
+  align-items:center;
+  padding: 22px 22px;
+  border-radius: 22px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-  border-radius: calc(var(--radius) + 6px);
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
   box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
 }
 
 .brand{
   display:flex;
-  gap:12px;
+  gap:14px;
   align-items:center;
 }
 .logo{
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background:
-    radial-gradient(12px 12px at 30% 30%, rgba(255,255,255,.28), transparent 60%),
-    radial-gradient(18px 18px at 70% 70%, rgba(255,255,255,.10), transparent 60%),
-    #1e1e20;
-  border: 1px solid var(--line);
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background:#1e1e20;
+  border:1px solid var(--line);
 }
 .brand h1{
   margin:0;
-  font-size:18px;
-  letter-spacing:.2px;
+  font-size:22px;
+  font-weight:600;
 }
 .brand p{
-  margin:2px 0 0;
-  font-size:13px;
-  color: var(--muted);
+  margin:4px 0 0;
+  font-size:15px;
+  color:var(--muted);
 }
 
-.actions{
-  display:flex;
-  gap:10px;
-  align-items:center;
+.actions .btn{
+  padding: 12px 16px;
+  font-size:15px;
+  border-radius: 14px;
+  border:1px solid var(--line);
+  background:#18181a;
+  color:var(--text);
+  cursor:pointer;
 }
-.btn{
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #141416;
-  color: var(--text);
-  font-size: 14px;
-  cursor: pointer;
-}
-.btn:hover{background:#19191b}
-
-.btn.primary{
-  background: #1b1b1d;
-}
-.btn.primary:hover{background:#202022}
+.actions .btn:hover{background:#1f1f22}
 
 .grid{
   display:grid;
-  grid-template-columns: 1.25fr .75fr;
-  gap: 18px;
-  margin-top: 18px;
+  grid-template-columns: 1.3fr .7fr;
+  gap: 20px;
+  margin-top: 22px;
 }
 @media (max-width: 900px){
   .grid{grid-template-columns:1fr}
 }
 
 .card{
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
-  border: 1px solid var(--line);
   border-radius: var(--radius);
+  border:1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
   box-shadow: var(--shadow);
-  overflow:hidden;
 }
 
 .cardHeader{
-  padding: 18px 18px 14px;
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
+  padding: 22px;
 }
 .cardHeader h2{
   margin:0;
-  font-size:16px;
+  font-size:18px;
 }
 .cardHeader .sub{
-  margin:6px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height:1.45;
+  margin-top:8px;
+  font-size:15px;
+  color:var(--muted);
 }
-.search{
-  width: 260px;
-  max-width: 45vw;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #121214;
-  color: var(--text);
-  outline:none;
-}
-.search::placeholder{color:#7f7f85}
 
-.list{
-  border-top:1px solid var(--line);
-}
 .row{
+  padding: 18px 22px;
+  border-top:1px solid var(--line);
   display:flex;
   justify-content:space-between;
-  gap:14px;
-  padding: 14px 18px;
-  border-top:1px solid rgba(255,255,255,.03);
 }
-.row:first-child{border-top:none}
-.row:hover{
-  background: rgba(255,255,255,.02);
+.row:hover{background:rgba(255,255,255,.03)}
+
+.title{
+  font-size:16px;
+  font-weight:500;
 }
-.left .title{
-  font-weight: 560;
-  font-size: 14px;
+.meta{
+  margin-top:6px;
+  font-size:14px;
+  color:var(--muted);
 }
-.left .meta{
-  margin-top: 6px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.right{
-  text-align:right;
-  min-width: 160px;
-}
+
 .pill{
-  display:inline-block;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--chip);
-  font-size: 12px;
-  color: var(--muted);
-}
-.small{
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--muted);
+  padding: 7px 12px;
+  font-size:13px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:var(--chip);
+  color:var(--muted);
 }
 
 .side{
-  padding: 18px;
+  padding: 22px;
 }
-.kpi{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  margin-top: 10px;
+.side h2{
+  font-size:18px;
+  margin:0;
 }
-.kpi .pill{color:#cfcfd3}
-
-.hr{
-  height:1px;
-  background: var(--line);
-  margin: 16px 0;
-}
-
 .post{
-  margin-top: 10px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: #141416;
+  margin-top:14px;
+  padding:16px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:#151517;
 }
 .post .who{
+  font-size:14px;
+  color:var(--muted);
   display:flex;
   justify-content:space-between;
-  gap:10px;
-  font-size: 13px;
-  color: var(--muted);
 }
 .post .text{
-  margin-top: 10px;
-  line-height:1.55;
-  font-size: 14px;
-  color: var(--text);
+  margin-top:10px;
+  font-size:16px;
+  line-height:1.6;
 }
 
 .footer{
-  margin-top: 16px;
-  color: var(--muted);
-  font-size: 12.5px;
+  margin-top:18px;
   text-align:center;
+  font-size:13px;
+  color:var(--muted);
 }
 </style>
 </head>
 
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div class="brand">
-        <div class="logo"></div>
-        <div>
-          <h1>placetalk</h1>
-          <p>ламповое место для обсуждений, идей и спокойного общения</p>
-        </div>
-      </div>
-      <div class="actions">
-        <button class="btn">Войти</button>
-        <button class="btn primary">Создать тему</button>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>placetalk</h1>
+        <p>ламповое место для спокойных разговоров</p>
       </div>
     </div>
-
-    <div class="grid">
-      <!-- ЛЕВО: разделы и темы -->
-      <div class="card">
-        <div class="cardHeader">
-          <div>
-            <h2>Разделы</h2>
-            <div class="sub">Без суеты. Пиши по делу или просто по-доброму болтай.</div>
-          </div>
-          <input class="search" placeholder="Поиск по форуму (пока макет)..." />
-        </div>
-
-        <div class="list">
-          <div class="row">
-            <div class="left">
-              <div class="title">Обсуждения</div>
-              <div class="meta">вопросы, мысли, разговоры</div>
-            </div>
-            <div class="right">
-              <span class="pill">42 темы</span>
-              <div class="small">последнее: сегодня</div>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="left">
-              <div class="title">Идеи</div>
-              <div class="meta">предложения, улучшения, планы</div>
-            </div>
-            <div class="right">
-              <span class="pill">18 тем</span>
-              <div class="small">последнее: вчера</div>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="left">
-              <div class="title">Общение</div>
-              <div class="meta">флудилка, мемы, жизнь</div>
-            </div>
-            <div class="right">
-              <span class="pill">65 тем</span>
-              <div class="small">последнее: 2 дня</div>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="left">
-              <div class="title">Новости</div>
-              <div class="meta">что нового на placetalk</div>
-            </div>
-            <div class="right">
-              <span class="pill">6 тем</span>
-              <div class="small">последнее: неделя</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ПРАВО: карточка «о форуме» + пример темы -->
-      <div class="card">
-        <div class="side">
-          <h2 style="margin:0;font-size:16px;">Сейчас в placetalk</h2>
-          <div class="sub" style="margin-top:6px;color:var(--muted);font-size:13px;line-height:1.45;">
-            Небольшое сообщество, где не гонятся за шумом. Тут ценят нормальный тон и мысли по делу.
-          </div>
-
-          <div class="kpi">
-            <span class="pill">онлайн: 12</span>
-            <span class="pill">участников: 108</span>
-            <span class="pill">тем: 131</span>
-          </div>
-
-          <div class="hr"></div>
-
-          <h2 style="margin:0;font-size:16px;">Пример обсуждения</h2>
-
-          <div class="post">
-            <div class="who">
-              <span>@user</span>
-              <span>сегодня</span>
-            </div>
-            <div class="text">
-              Хотелось бы, чтобы тут было уютно: меньше токсичности, больше нормального общения.
-            </div>
-          </div>
-
-          <div class="post">
-            <div class="who">
-              <span>@admin</span>
-              <span>сегодня</span>
-            </div>
-            <div class="text">
-              Согласен. Начнём с простого: правила, структура разделов и понятный вид.
-            </div>
-          </div>
-
-          <div class="footer">placetalk • макет форума</div>
-        </div>
-      </div>
+    <div class="actions">
+      <button class="btn">Войти</button>
+      <button class="btn">Создать тему</button>
     </div>
   </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="cardHeader">
+        <h2>Разделы</h2>
+        <div class="sub">Без спешки и без шума</div>
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="title">Обсуждения</div>
+          <div class="meta">вопросы и мысли</div>
+        </div>
+        <span class="pill">42 темы</span>
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="title">Идеи</div>
+          <div class="meta">предложения и планы</div>
+        </div>
+        <span class="pill">18 тем</span>
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="title">Общение</div>
+          <div class="meta">флуд и жизнь</div>
+        </div>
+        <span class="pill">65 тем</span>
+      </div>
+    </div>
+
+    <div class="card side">
+      <h2>Пример сообщения</h2>
+
+      <div class="post">
+        <div class="who">
+          <span>@user</span>
+          <span>сегодня</span>
+        </div>
+        <div class="text">
+          Теперь текст читается нормально и глаза не устают.
+        </div>
+      </div>
+
+      <div class="footer">placetalk • макет</div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
