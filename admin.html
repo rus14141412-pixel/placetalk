@@ -17,13 +17,17 @@ button:hover{background:#202023}
 .item{border:1px solid #2a2a2c;border-radius:16px;background:#151517;padding:14px}
 .m{color:#b4b4b8;font-size:13px;margin-top:6px}
 .badge{display:inline-block;padding:6px 10px;border:1px solid #2a2a2c;border-radius:999px;background:#232325;color:#b4b4b8;font-size:12px}
+.smallBtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 </style>
 </head>
 <body>
+
 <div class="wrap">
   <div class="card">
-    <h1>placetalk — админка (жалобы)</h1>
-    <div class="m">Загружает последние 100 жалоб. Пока только просмотр.</div>
+    <h1>placetalk — админка</h1>
+    <div class="m">
+      Жалобы загружаются через защищённую RPC-функцию.
+    </div>
 
     <div class="row">
       <input id="url" placeholder="SUPABASE_URL (https://...supabase.co)" />
@@ -31,6 +35,7 @@ button:hover{background:#202023}
     </div>
 
     <div class="row">
+      <input id="adminKey" placeholder="Админ-код (например: Grimmoved-1234)" />
       <button id="load">Загрузить жалобы</button>
     </div>
 
@@ -42,15 +47,26 @@ button:hover{background:#202023}
 const list = document.getElementById("list");
 
 function headers(key){
-  return { apikey:key, Authorization:`Bearer ${key}`, Accept:"application/json" };
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+    Accept: "application/json"
+  };
 }
 
 function esc(s){
-  return String(s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
+  return String(s).replace(/[&<>"']/g,c=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
 }
 
-async function rest(url,key,path){
-  const r = await fetch(url + "/rest/v1" + path, { headers: headers(key) });
+async function rpc(url,key,fn,body){
+  const r = await fetch(url + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: headers(key),
+    body: JSON.stringify(body)
+  });
   const t = await r.text();
   if(!r.ok) throw new Error(t);
   return t ? JSON.parse(t) : null;
@@ -59,12 +75,16 @@ async function rest(url,key,path){
 document.getElementById("load").onclick = async () => {
   const url = document.getElementById("url").value.trim();
   const key = document.getElementById("key").value.trim();
+  const adminKey = document.getElementById("adminKey").value.trim();
+
   if(!url || !key){ alert("Вставь URL и anon key"); return; }
+  if(!adminKey){ alert("Введи админ-код"); return; }
 
   try{
-    const reps = await rest(url, key,
-      "/reports?select=id,target_type,target_id,reason,reporter,created_at&order=created_at.desc&limit=100"
-    );
+    const reps = await rpc(url, key, "admin_list_reports", {
+      admin_key: adminKey,
+      lim: 100
+    });
 
     list.innerHTML = "";
     if(!reps || reps.length === 0){
@@ -81,15 +101,52 @@ document.getElementById("load").onclick = async () => {
           <span class="badge">${esc(r.target_id)}</span>
         </div>
         <div style="margin-top:10px">${esc(r.reason)}</div>
-        <div class="m">от @${esc(r.reporter)} • ${esc(new Date(r.created_at).toLocaleString())}</div>
+        <div class="m">
+          от @${esc(r.reporter)} • ${esc(new Date(r.created_at).toLocaleString())}
+        </div>
+        <div class="smallBtns">
+          <button ${r.target_type!=="topic"?"disabled":""}
+            data-hide-topic="${esc(r.target_id)}">Скрыть тему</button>
+          <button ${r.target_type!=="post"?"disabled":""}
+            data-hide-post="${esc(r.target_id)}">Скрыть пост</button>
+        </div>
       `;
+
+      el.querySelectorAll("button").forEach(btn=>{
+        btn.onclick = async () => {
+          try{
+            const tid = btn.getAttribute("data-hide-topic");
+            const pid = btn.getAttribute("data-hide-post");
+
+            if(tid && !btn.disabled){
+              await rpc(url, key, "admin_hide_topic", {
+                admin_key: adminKey,
+                topic: tid
+              });
+              alert("Тема скрыта.");
+            }
+
+            if(pid && !btn.disabled){
+              await rpc(url, key, "admin_hide_post", {
+                admin_key: adminKey,
+                post: pid
+              });
+              alert("Пост скрыт.");
+            }
+          }catch(e){
+            alert("Ошибка: " + e.message);
+          }
+        };
+      });
+
       list.appendChild(el);
     });
 
-  } catch(e){
+  }catch(e){
     alert("Ошибка: " + e.message);
   }
 };
 </script>
+
 </body>
 </html>
