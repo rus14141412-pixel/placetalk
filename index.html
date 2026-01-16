@@ -185,6 +185,27 @@ body{
 </div>
 
 <script>
+// --- anti-spam limits ---
+const LIMIT_TOPIC_MS = 60_000;   // 1 тема в минуту
+const LIMIT_REPLY_MS = 15_000;   // 1 ответ в 15 секунд
+const MAX_TITLE = 80;
+const MAX_BODY = 2000;
+const MAX_REPLY = 1500;
+
+const LS_LAST_TOPIC = "placetalk_last_topic_ts";
+const LS_LAST_REPLY = "placetalk_last_reply_ts";
+
+function canDo(key, limitMs){
+  const last = Number(localStorage.getItem(key) || "0");
+  const now = Date.now();
+  if(now - last < limitMs){
+    const wait = Math.ceil((limitMs - (now - last)) / 1000);
+    alert(`Слишком часто. Подожди ${wait} сек.`);
+    return false;
+  }
+  localStorage.setItem(key, String(now));
+  return true;
+}  
 /*** >>> ТВОИ НАСТРОЙКИ SUPABASE <<< ***/
 const SUPABASE_URL = "https://wfwvzvghmkbhvqcwusma.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indmd3Z6dmdobWtiaHZxY3d1c21hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1NDQ2MTksImV4cCI6MjA4NDEyMDYxOX0.wCmHEOsdrm__Sa-4-CzRs-wLICqsW6vEPmY5ucf9OTo";
