@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>placetalk — admin</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0f0f10;color:#f2f2f3}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 18px}
+.card{border:1px solid #2a2a2c;border-radius:18px;background:#121214;padding:18px}
+h1{margin:0 0 12px;font-size:20px}
+input,textarea{width:100%;padding:12px;border-radius:14px;border:1px solid #2a2a2c;background:#0f0f11;color:#f2f2f3;outline:none}
+textarea{min-height:80px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+button{padding:12px 14px;border-radius:14px;border:1px solid #2a2a2c;background:#18181a;color:#f2f2f3;cursor:pointer}
+button:hover{background:#202023}
+.list{margin-top:14px;display:grid;gap:10px}
+.item{border:1px solid #2a2a2c;border-radius:16px;background:#151517;padding:14px}
+.m{color:#b4b4b8;font-size:13px;margin-top:6px}
+.badge{display:inline-block;padding:6px 10px;border:1px solid #2a2a2c;border-radius:999px;background:#232325;color:#b4b4b8;font-size:12px}
+a{color:#b4b4b8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>placetalk — админка</h1>
+    <div class="m">Сюда попадают жалобы. Чтобы скрыть контент, нужен админ-код.</div>
+
+    <div class="row">
+      <input id="url" placeholder="SUPABASE_URL (https://...supabase.co)" />
+      <input id="key" placeholder="SUPABASE anon key (eyJ...)" />
+    </div>
+    <div class="row">
+      <input id="adminKey" placeholder="Админ-код (сейчас: Grimmoved-1234)" />
+      <button id="load">Загрузить жалобы</button>
+    </div>
+
+    <div class="list" id="list"></div>
+    <div class="m">Совет: не храни admin-код в коде сайта. Вводи руками.</div>
+  </div>
+</div>
+
+<script>
+const list = document.getElementById("list");
+function h(url,key){
+  return {
+    apikey:key,
+    Authorization:`Bearer ${key}`,
+    "Content-Type":"application/json",
+    Accept:"application/json"
+  };
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]))}
+async function rest(url,key,path){
+  const r=await fetch(url+"/rest/v1"+path,{headers:h(url,key)});
+  const t=await r.text();
+  if(!r.ok) throw new Error(t);
+  return t?JSON.parse(t):null;
+}
+async function rpc(url,key,fn,body){
+  const r=await fetch(url+"/rest/v1/rpc/"+fn,{method:"POST",headers:h(url,key),body:JSON.stringify(body)});
+  const t=await r.text();
+  if(!r.ok) throw new Error(t);
+  return t?JSON.parse(t):null;
+}
+
+document.getElementById("load").onclick = async () => {
+  const url = document.getElementById("url").value.trim();
+  const key = document.getElementById("key").value.trim();
+  const adminKey = document.getElementById("adminKey").value.trim();
+  if(!url||!key){ alert("Вставь URL и anon key"); return; }
+
+  try{
+    const reps = await rest(url,key,`/reports?select=id,target_type,target_id,reason,reporter,created_at&order=created_at.desc&limit=100`);
+    list.innerHTML = "";
+    if(!reps || reps.length===0){
+      list.innerHTML = `<div class="item">Пока нет жалоб.</div>`;
+      return;
+    }
+    reps.forEach(r=>{
+      const el=document.createElement("div");
+      el.className="item";
+      el.innerHTML = `
+        <div><span class="badge">${esc(r.target_type)}</span> <span class="badge">${esc(r.target_id)}</span></div>
+        <div style="margin-top:8px">${esc(r.reason)}</div>
+        <div class="m">от @${esc(r.reporter)} • ${esc(new Date(r.created_at).toLocaleString())}</div>
+        <div class="row" style="margin-top:10px">
+          <button data-hide-topic="${r.target_type==='topic'?r.target_id:''}" ${r.target_type==='topic'?'':'disabled'}>Скрыть тему</button>
+          <button data-hide-post="${r.target_type==='post'?r.target_id:''}" ${r.target_type==='post'?'':'disabled'}>Скрыть пост</button>
+        </div>
+      `;
+      el.querySelectorAll("button").forEach(btn=>{
+        btn.onclick = async () => {
+          try{
+            if(!adminKey){ alert("Введи админ-код"); return; }
+            const tid = btn.getAttribute("data-hide-topic");
+            const pid = btn.getAttribute("data-hide-post");
+            if(tid){
+              await rpc(url,key,"admin_hide_topic",{admin_key:adminKey, topic:tid});
+              alert("Тема скрыта.");
+            }
+            if(pid){
+              await rpc(url,key,"admin_hide_post",{admin_key:adminKey, post:pid});
+              alert("Пост скрыт.");
+            }
+          }catch(e){
+            alert("Ошибка: "+e.message);
+          }
+        };
+      });
+      list.appendChild(el);
+    });
+  }catch(e){
+    alert("Ошибка загрузки: "+e.message);
+  }
+};
+</script>
+</body>
+</html>
