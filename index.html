@@ -82,7 +82,7 @@ body{
   background:#151517;
 }
 .who{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:var(--muted)}
-.text{margin-top:10px;font-size:16px;line-height:1.6}
+.text{margin-top:10px;font-size:16px;line-height:1.6;white-space:pre-wrap}
 .footer{margin-top:18px;text-align:center;font-size:13px;color:var(--muted)}
 .modalBack{
   position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;
@@ -156,17 +156,17 @@ body{
         <div class="sub" style="margin-top:8px">
           <span class="link" id="homeLink">На главную</span> ·
           <span class="link" id="seedLink">Заполнить примером</span> ·
-          <span class="link" id="clearLink">Очистить у себя</span>
+          <span class="link" id="clearLink">Сбросить ник</span>
         </div>
 
         <div class="hr"></div>
 
-        <h2 style="margin:0;font-size:18px">Что дальше</h2>
+        <h2 style="margin:0;font-size:18px">Важно</h2>
         <div class="sub" style="margin-top:8px">
-          Сейчас доступ открыт всем (без регистрации). Следующий правильный шаг — добавить простую авторизацию и правила.
+          Сейчас доступ открыт всем (без регистрации). Следующий шаг — сделать вход/роли и защиту от спама.
         </div>
 
-        <div class="footer">placetalk • supabase</div>
+        <div class="footer">placetalk • supabase REST</div>
       </div>
     </div>
   </div>
@@ -184,39 +184,35 @@ body{
   </div>
 </div>
 
-<!-- Supabase JS (UMD) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
 /*** >>> ТВОИ НАСТРОЙКИ SUPABASE <<< ***/
 const SUPABASE_URL = "https://wfwvzghmkbhvqcwusma.supabase.co";
 const SUPABASE_KEY = "sb_publishable_QElYekB6NtO9POPRxY6GvQ_hTPQ9FT8";
 /*** -------------------------------- ***/
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+const REST = `${SUPABASE_URL}/rest/v1`;
 const LS_NICK = "placetalk_nick_v1";
-
-function nowLabel(){
-  const d = new Date();
-  const pad = n => String(n).padStart(2,"0");
-  return `${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function getNick(){
-  return localStorage.getItem(LS_NICK) || "гость";
-}
-function setNick(n){
-  localStorage.setItem(LS_NICK, n.trim() || "гость");
-  renderHeader();
-}
-
-function renderHeader(){
-  document.getElementById("whoPill").textContent = getNick();
-}
 
 let state = { topics: [], postsByTopic: new Map() };
 let view = { mode:"home", topicId:null, q:"" };
+
+function headers(){
+  return {
+    "apikey": SUPABASE_KEY,
+    "Authorization": `Bearer ${SUPABASE_KEY}`,
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  };
+}
+
+function setStatus(ok, msg){
+  const box = document.getElementById("statusBox");
+  box.innerHTML = ok ? `✅ <b>Ок</b> — ${msg}` : `⚠️ <b>Проблема</b> — ${escapeHtml(msg)}`;
+}
+
+function getNick(){ return localStorage.getItem(LS_NICK) || "гость"; }
+function setNick(n){ localStorage.setItem(LS_NICK, (n||"").trim() || "гость"); renderHeader(); }
+function renderHeader(){ document.getElementById("whoPill").textContent = getNick(); }
 
 function openModal(title, bodyHtml, onOk){
   const back = document.getElementById("modalBack");
@@ -240,34 +236,53 @@ function escapeHtml(s){
   }[c]));
 }
 
-function setStatus(ok, msg){
-  const box = document.getElementById("statusBox");
-  box.innerHTML = ok ? `✅ <b>Ок</b> — ${msg}` : `⚠️ <b>Проблема</b> — ${msg}`;
+function fmtTime(iso){
+  if(!iso) return "";
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2,"0");
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// -------- REST calls --------
+async function restGet(path){
+  const r = await fetch(`${REST}${path}`, { method:"GET", headers: headers() });
+  const text = await r.text();
+  if(!r.ok) throw new Error(`${r.status} ${r.statusText}: ${text}`);
+  return text ? JSON.parse(text) : null;
+}
+
+async function restPost(path, body){
+  const r = await fetch(`${REST}${path}`, { method:"POST", headers: { ...headers(), "Prefer":"return=representation" }, body: JSON.stringify(body) });
+  const text = await r.text();
+  if(!r.ok) throw new Error(`${r.status} ${r.statusText}: ${text}`);
+  return text ? JSON.parse(text) : null;
 }
 
 async function loadTopics(){
-  const { data, error } = await supabaseClient
-    .from("topics")
-    .select("id,title,body,author,created_at")
-    .order("created_at", { ascending: false });
-
-  if(error) throw error;
+  // order=created_at.desc
+  const data = await restGet(`/topics?select=id,title,body,author,created_at&order=created_at.desc`);
   state.topics = data || [];
   document.getElementById("countPill").textContent = `тем: ${state.topics.length}`;
 }
 
 async function loadPosts(topicId){
-  const { data, error } = await supabaseClient
-    .from("posts")
-    .select("id,topic_id,author,text,created_at")
-    .eq("topic_id", topicId)
-    .order("created_at", { ascending: true });
-
-  if(error) throw error;
+  const data = await restGet(`/posts?select=id,topic_id,author,text,created_at&topic_id=eq.${encodeURIComponent(topicId)}&order=created_at.asc`);
   state.postsByTopic.set(topicId, data || []);
 }
 
-function formatTopics(topics){
+async function createTopic(title, body){
+  const data = await restPost(`/topics`, [{ title, body, author: getNick() }]);
+  // вернётся массив с 1 элементом
+  return data?.[0];
+}
+
+async function createPost(topicId, text){
+  const data = await restPost(`/posts`, [{ topic_id: topicId, author: getNick(), text }]);
+  return data?.[0];
+}
+
+// -------- UI render --------
+function filterTopics(topics){
   const q = view.q.trim().toLowerCase();
   if(!q) return topics;
   return topics.filter(t =>
@@ -277,22 +292,12 @@ function formatTopics(topics){
   );
 }
 
-function fmtTime(iso){
-  if(!iso) return "";
-  // Покажем коротко: DD.MM HH:MM
-  try{
-    const d = new Date(iso);
-    const pad = n => String(n).padStart(2,"0");
-    return `${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }catch(e){ return iso; }
-}
-
 function renderHome(){
   document.getElementById("mainTitle").textContent = "Темы";
   document.getElementById("mainSub").textContent = "Создавай темы — они видны всем. Пока без регистрации.";
 
   const list = document.getElementById("list");
-  const topics = formatTopics(state.topics);
+  const topics = filterTopics(state.topics);
 
   if(topics.length === 0){
     list.innerHTML = `
@@ -306,20 +311,18 @@ function renderHome(){
     return;
   }
 
-  list.innerHTML = topics.map(t => {
-    return `
-      <div class="row" data-open="${t.id}">
-        <div>
-          <div class="title">${escapeHtml(t.title)}</div>
-          <div class="meta">${escapeHtml((t.body||"").slice(0,90))}${(t.body||"").length>90?"…":""}</div>
-        </div>
-        <div class="right">
-          <span class="pill">@${escapeHtml(t.author || "гость")}</span>
-          <div class="small">${escapeHtml(fmtTime(t.created_at))}</div>
-        </div>
+  list.innerHTML = topics.map(t => `
+    <div class="row" data-open="${t.id}">
+      <div>
+        <div class="title">${escapeHtml(t.title)}</div>
+        <div class="meta">${escapeHtml((t.body||"").slice(0,90))}${(t.body||"").length>90?"…":""}</div>
       </div>
-    `;
-  }).join("");
+      <div class="right">
+        <span class="pill">@${escapeHtml(t.author || "гость")}</span>
+        <div class="small">${escapeHtml(fmtTime(t.created_at))}</div>
+      </div>
+    </div>
+  `).join("");
 
   [...list.querySelectorAll("[data-open]")].forEach(el=>{
     el.onclick = ()=>openTopic(el.getAttribute("data-open"));
@@ -374,14 +377,14 @@ async function renderTopic(topic){
       const text = (document.getElementById("replyText").value || "").trim();
       if(!text){ alert("Напиши текст ответа"); return false; }
 
-      const { error } = await supabaseClient
-        .from("posts")
-        .insert([{ topic_id: topic.id, author: getNick(), text }]);
-
-      if(error){ alert("Ошибка сохранения: " + error.message); return false; }
-
-      await loadPosts(topic.id);
-      await renderTopic(topic);
+      try{
+        await createPost(topic.id, text);
+        await loadPosts(topic.id);
+        await renderTopic(topic);
+      }catch(e){
+        alert("Ошибка сохранения: " + e.message);
+        return false;
+      }
     });
   };
 }
@@ -406,7 +409,7 @@ async function openTopic(topicId){
   await render();
 }
 
-// UI actions
+// -------- buttons --------
 document.getElementById("loginBtn").onclick = () => {
   openModal("Твой ник", `
     <div class="field">
@@ -436,15 +439,15 @@ document.getElementById("newTopicBtn").onclick = () => {
     if(title.length>80){ alert("Слишком длинное название (до 80 символов)"); return false; }
     if(!body){ alert("Нужен текст"); return false; }
 
-    const { error } = await supabaseClient
-      .from("topics")
-      .insert([{ title, body, author: getNick() }]);
-
-    if(error){ alert("Ошибка сохранения: " + error.message); return false; }
-
-    await loadTopics();
-    view.mode="home"; view.topicId=null;
-    await render();
+    try{
+      await createTopic(title, body);
+      await loadTopics();
+      view.mode="home"; view.topicId=null;
+      await render();
+    }catch(e){
+      alert("Ошибка сохранения: " + e.message);
+      return false;
+    }
   });
 };
 
@@ -455,30 +458,27 @@ document.getElementById("homeLink").onclick = async () => {
 };
 
 document.getElementById("seedLink").onclick = async () => {
-  // Заполним онлайн-примером (только если пока пусто)
-  if(state.topics.length){
-    alert("Темы уже есть. Не будем мешать.");
-    return;
+  try{
+    await loadTopics();
+    if(state.topics.length){
+      alert("Темы уже есть. Не будем мешать.");
+      return;
+    }
+    await createTopic("Правила и атмосфера placetalk", "Давайте без токсичности. Спокойно общаемся, не унижаем друг друга.");
+    await createTopic("Идеи для развития форума", "Что добавить первым: категории, поиск, лайки, закрепы?");
+    await loadTopics();
+    await render();
+  }catch(e){
+    alert("Ошибка: " + e.message);
   }
-  const a = await supabaseClient.from("topics").insert([
-    { title:"Правила и атмосфера placetalk", body:"Давайте без токсичности. Спокойно общаемся, не унижаем друг друга.", author:"admin" },
-    { title:"Идеи для развития форума", body:"Что добавить первым: категории, поиск, лайки, закрепы?", author:"admin" }
-  ]);
-  if(a.error){ alert("Ошибка: " + a.error.message); return; }
-  await loadTopics();
-  await render();
 };
 
 document.getElementById("clearLink").onclick = () => {
-  // Это очистка только у тебя: ник и поиск/вид. Онлайн-данные мы не удаляем.
-  openModal("Очистить у себя?", `
-    <div class="sub">Сбросит ник и поиск в этом браузере. Онлайн-темы не трогаем.</div>
+  openModal("Сбросить ник?", `
+    <div class="sub">Удалит ник в этом браузере. Онлайн-темы не трогаем.</div>
   `, () => {
     localStorage.removeItem(LS_NICK);
-    view.q = "";
-    document.getElementById("search").value = "";
     renderHeader();
-    renderHome();
   });
 };
 
@@ -499,7 +499,6 @@ document.getElementById("search").addEventListener("input", async (e)=>{
   }catch(err){
     console.error(err);
     setStatus(false, err.message || String(err));
-    // покажем хоть пустую главную, чтобы интерфейс жил
     renderHome();
   }
 })();
